@@ -1,0 +1,36 @@
+# Keil MDK build output
+MDK-ARM/*.build_log.htm
+MDK-ARM/*.crf
+MDK-ARM/*.d
+MDK-ARM/*.dep
+MDK-ARM/*.htm
+MDK-ARM/*.iex
+MDK-ARM/*.lnp
+MDK-ARM/*.lst
+MDK-ARM/*.map
+MDK-ARM/*.o
+MDK-ARM/*.scvd
+MDK-ARM/*.sct
+MDK-ARM/*.tra
+MDK-ARM/*.uvguix.*
+MDK-ARM/*.axf
+MDK-ARM/*.hex
+MDK-ARM/*.bin
+MDK-ARM/*.elf
+MDK-ARM/*.lnx
+MDK-ARM/*.ini
+MDK-ARM/JLink*
+MDK-ARM/EventRecorderStub.scvd
+MDK-ARM/build/
+MDK-ARM/Output/
+MDK-ARM/DebugConfig/
+MDK-ARM/stm32h743_lvds_camera/
+
+# STM32CubeMX
+.mxproject
+
+# IDE / editor
+.vscode/
+.idea/
+.claude/
+*.bak
