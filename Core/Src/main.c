@@ -58,9 +58,8 @@
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
-static void MPU_Config(void);
 /* USER CODE BEGIN PFP */
-
+static void MPU_Config(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -76,11 +75,9 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
+  MPU_Config();  /* before HAL_Init(): MPU must cover SDRAM first */
 
   /* USER CODE END 1 */
-
-  /* MPU Configuration--------------------------------------------------------*/
-  MPU_Config();
 
   /* MCU Configuration--------------------------------------------------------*/
 
@@ -189,9 +186,8 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
-
-/* USER CODE END 4 */
-
+/* Hand-maintained MPU setup (the .ioc holds no MPU region entries):
+ * keep it inside this USER CODE block so regeneration preserves it. */
  /* MPU Configuration */
 
 void MPU_Config(void)
@@ -236,6 +232,8 @@ void MPU_Config(void)
   HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
 
 }
+
+/* USER CODE END 4 */
 
 /**
   * @brief  This function is executed in case of error occurrence.
