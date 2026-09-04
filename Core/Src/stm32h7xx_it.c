@@ -51,7 +51,13 @@
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+/* HardFault 诊断：在 Keil Watch 中查看 fault_* 变量即可定位异常原因。 */
+volatile uint32_t fault_cfsr = 0U;      /* 0xE000ED28: MMFSR+BFSR+UFSR */
+volatile uint32_t fault_hfsr = 0U;      /* 0xE000ED2C: bit30=FORCED 表示可配置 fault 升级 */
+volatile uint32_t fault_bfar = 0U;      /* 0xE000ED38: BusFault 目标地址 */
+volatile uint32_t fault_mmfar = 0U;     /* 0xE000ED34: MemManage 目标地址 */
+volatile uint32_t fault_stacked_pc = 0U;  /* 出错指令的地址 */
+volatile uint32_t fault_stacked_lr = 0U;  /* 出错时的返回地址 */
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
@@ -85,7 +91,17 @@ void NMI_Handler(void)
 void HardFault_Handler(void)
 {
   /* USER CODE BEGIN HardFault_IRQn 0 */
-
+  /* 捕获 fault 状态寄存器和异常栈帧中的出错 PC/LR。
+   * 本工程 fault 都发生在主循环（线程模式，用 MSP），因此从 MSP 取栈帧。 */
+  {
+    const uint32_t *stack = (const uint32_t *)__get_MSP();
+    fault_cfsr = SCB->CFSR;
+    fault_hfsr = SCB->HFSR;
+    fault_bfar = SCB->BFAR;
+    fault_mmfar = SCB->MMFAR;
+    fault_stacked_pc = stack[6];
+    fault_stacked_lr = stack[5];
+  }
   /* USER CODE END HardFault_IRQn 0 */
   while (1)
   {

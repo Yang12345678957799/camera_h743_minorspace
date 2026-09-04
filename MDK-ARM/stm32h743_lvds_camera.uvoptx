@@ -153,97 +153,97 @@
         <Ww>
           <count>0</count>
           <WinNumber>1</WinNumber>
-          <ItemText>avi_record_request</ItemText>
+          <ItemText>storage_mount_status</ItemText>
         </Ww>
         <Ww>
           <count>1</count>
           <WinNumber>1</WinNumber>
-          <ItemText>avi_record_active</ItemText>
+          <ItemText>storage_sector_count</ItemText>
         </Ww>
         <Ww>
           <count>2</count>
           <WinNumber>1</WinNumber>
-          <ItemText>avi_record_status</ItemText>
+          <ItemText>storage_sector_size</ItemText>
         </Ww>
         <Ww>
           <count>3</count>
           <WinNumber>1</WinNumber>
-          <ItemText>avi_record_frames</ItemText>
+          <ItemText>storage_test_request</ItemText>
         </Ww>
         <Ww>
           <count>4</count>
           <WinNumber>1</WinNumber>
-          <ItemText>avi_record_bytes</ItemText>
+          <ItemText>storage_test_status</ItemText>
         </Ww>
         <Ww>
           <count>5</count>
           <WinNumber>1</WinNumber>
-          <ItemText>camera_capture_stall_recoveries</ItemText>
+          <ItemText>storage_test_bytes_written</ItemText>
         </Ww>
         <Ww>
           <count>6</count>
           <WinNumber>1</WinNumber>
-          <ItemText>camera_dcmi_error_events</ItemText>
+          <ItemText>storage_test_bytes_read</ItemText>
         </Ww>
         <Ww>
           <count>7</count>
           <WinNumber>1</WinNumber>
-          <ItemText>camera_jpeg_last_eoi_found</ItemText>
+          <ItemText>camera_jpeg_last_bytes</ItemText>
         </Ww>
         <Ww>
           <count>8</count>
           <WinNumber>1</WinNumber>
-          <ItemText>camera_capture_status</ItemText>
+          <ItemText>camera_jpeg_last_soi_found</ItemText>
         </Ww>
         <Ww>
           <count>9</count>
           <WinNumber>1</WinNumber>
-          <ItemText>camera_dma_remaining_words</ItemText>
+          <ItemText>camera_jpeg_last_eoi_found</ItemText>
         </Ww>
         <Ww>
           <count>10</count>
           <WinNumber>1</WinNumber>
-          <ItemText>camera_jpeg_first_byte_1</ItemText>
+          <ItemText>camera_jpeg_save_request</ItemText>
         </Ww>
         <Ww>
           <count>11</count>
           <WinNumber>1</WinNumber>
-          <ItemText>camera_jpeg_first_byte_2</ItemText>
+          <ItemText>camera_jpeg_save_status</ItemText>
         </Ww>
         <Ww>
           <count>12</count>
           <WinNumber>1</WinNumber>
-          <ItemText>camera_jpeg_first_byte_3</ItemText>
+          <ItemText>camera_jpeg_images_saved</ItemText>
         </Ww>
         <Ww>
           <count>13</count>
           <WinNumber>1</WinNumber>
-          <ItemText>camera_jpeg_first_byte_0</ItemText>
+          <ItemText>avi_record_request</ItemText>
         </Ww>
         <Ww>
           <count>14</count>
           <WinNumber>1</WinNumber>
-          <ItemText>camera_capture_status</ItemText>
+          <ItemText>avi_record_active</ItemText>
         </Ww>
         <Ww>
           <count>15</count>
           <WinNumber>1</WinNumber>
-          <ItemText>camera_dcmi_vsync_events</ItemText>
+          <ItemText>avi_record_status</ItemText>
         </Ww>
         <Ww>
           <count>16</count>
           <WinNumber>1</WinNumber>
-          <ItemText>camera_dcmi_line_events</ItemText>
+          <ItemText>avi_record_frames</ItemText>
         </Ww>
         <Ww>
           <count>17</count>
           <WinNumber>1</WinNumber>
-          <ItemText>camera_dcmi_error_events</ItemText>
+          <ItemText>avi_record_bytes</ItemText>
         </Ww>
         <Ww>
           <count>18</count>
           <WinNumber>1</WinNumber>
-          <ItemText>camera_dcmi_error_code</ItemText>
+          <ItemText>camera_capture_status</ItemText>
         </Ww>
         <Ww>
           <count>19</count>
@@ -253,12 +253,92 @@
         <Ww>
           <count>20</count>
           <WinNumber>1</WinNumber>
-          <ItemText>camera_dcmi_status_reg</ItemText>
+          <ItemText>camera_jpeg_received_bytes</ItemText>
         </Ww>
         <Ww>
           <count>21</count>
           <WinNumber>1</WinNumber>
+          <ItemText>camera_capture_stall_recoveries</ItemText>
+        </Ww>
+        <Ww>
+          <count>22</count>
+          <WinNumber>1</WinNumber>
+          <ItemText>sd_disk_last_result</ItemText>
+        </Ww>
+        <Ww>
+          <count>23</count>
+          <WinNumber>1</WinNumber>
+          <ItemText>uwTick</ItemText>
+        </Ww>
+        <Ww>
+          <count>24</count>
+          <WinNumber>1</WinNumber>
+          <ItemText>camera_frame_ready</ItemText>
+        </Ww>
+        <Ww>
+          <count>25</count>
+          <WinNumber>1</WinNumber>
           <ItemText>camera_jpeg_frame_events</ItemText>
+        </Ww>
+        <Ww>
+          <count>26</count>
+          <WinNumber>1</WinNumber>
+          <ItemText>camera_dcmi_error_events</ItemText>
+        </Ww>
+        <Ww>
+          <count>27</count>
+          <WinNumber>1</WinNumber>
+          <ItemText>camera_dcmi_error_code</ItemText>
+        </Ww>
+        <Ww>
+          <count>28</count>
+          <WinNumber>1</WinNumber>
+          <ItemText>camera_dma_error_code</ItemText>
+        </Ww>
+        <Ww>
+          <count>29</count>
+          <WinNumber>1</WinNumber>
+          <ItemText>sd_disk_card_state</ItemText>
+        </Ww>
+        <Ww>
+          <count>30</count>
+          <WinNumber>1</WinNumber>
+          <ItemText>sd_disk_last_hal_status</ItemText>
+        </Ww>
+        <Ww>
+          <count>31</count>
+          <WinNumber>1</WinNumber>
+          <ItemText>sd_disk_last_hal_error</ItemText>
+        </Ww>
+        <Ww>
+          <count>32</count>
+          <WinNumber>1</WinNumber>
+          <ItemText>fault_cfsr</ItemText>
+        </Ww>
+        <Ww>
+          <count>33</count>
+          <WinNumber>1</WinNumber>
+          <ItemText>fault_hfsr</ItemText>
+        </Ww>
+        <Ww>
+          <count>34</count>
+          <WinNumber>1</WinNumber>
+          <ItemText>fault_bfar</ItemText>
+        </Ww>
+        <Ww>
+          <count>35</count>
+          <WinNumber>1</WinNumber>
+          <ItemText>fault_mmfar</ItemText>
+        </Ww>
+        <Ww>
+          <count>36</count>
+          <WinNumber>1</WinNumber>
+          <ItemText>fault_stacked_pc</ItemText>
+        </Ww>
+        <Ww>
+          <count>37</count>
+          <WinNumber>1</WinNumber>
+          <ItemText>fault_stacked_lr</ItemText>
         </Ww>
       </WatchWindow1>
       <MemoryWindow1>
@@ -323,7 +403,7 @@
 
   <Group>
     <GroupName>Application/MDK-ARM</GroupName>
-    <tvExp>0</tvExp>
+    <tvExp>1</tvExp>
     <tvExpOptDlg>0</tvExpOptDlg>
     <cbSel>0</cbSel>
     <RteFlg>0</RteFlg>
@@ -343,7 +423,7 @@
 
   <Group>
     <GroupName>Application/User/Core</GroupName>
-    <tvExp>0</tvExp>
+    <tvExp>1</tvExp>
     <tvExpOptDlg>0</tvExpOptDlg>
     <cbSel>0</cbSel>
     <RteFlg>0</RteFlg>

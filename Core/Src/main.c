@@ -223,7 +223,9 @@ void MPU_Config(void)
   MPU_InitStruct.BaseAddress = 0xC0000000U;
   MPU_InitStruct.Size = MPU_REGION_SIZE_32MB;
   MPU_InitStruct.SubRegionDisable = 0x00U;
-  MPU_InitStruct.TypeExtField = MPU_TEX_LEVEL0;
+  /* TEX=1 + C=0 + B=0：Normal 非缓存内存。TEX=0+C=0+B=0 是 Strongly-Ordered，
+   * 其非对齐访问会触发 UNALIGNED HardFault（FatFs 直通写 SD 时指针可能 2 字节对齐）。 */
+  MPU_InitStruct.TypeExtField = MPU_TEX_LEVEL1;
   MPU_InitStruct.AccessPermission = MPU_REGION_FULL_ACCESS;
   MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_DISABLE;
   MPU_InitStruct.IsShareable = MPU_ACCESS_SHAREABLE;

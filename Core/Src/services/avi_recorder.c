@@ -12,7 +12,8 @@ volatile uint32_t avi_record_bytes = 0U;
 static FIL avi_file;
 /* 与原 F429 相同：录像过程中把每帧长度写入临时参数文件，结束时读回。 */
 static FIL avi_parameter_file;
-static const TCHAR avi_parameter_path[] = "0:/video/AVI00001.param";
+/* FatFs 关闭了 LFN（_USE_LFN=0），路径必须符合 8.3 短文件名格式。 */
+static const TCHAR avi_parameter_path[] = "0:/video/AVI00001.PRM";
 static uint32_t avi_riff_size_pos;
 static uint32_t avi_avih_frames_pos;
 static uint32_t avi_strh_frames_pos;
