@@ -12,6 +12,8 @@
 
 /* DCMI 帧完成回调置 1；应用层处理完该帧后再启动下一次采集。 */
 extern volatile uint8_t camera_frame_ready;
+/* 1 while capture is paused for an AVI file transfer (see app_camera). */
+extern volatile uint8_t camera_capture_paused;
 /* HAL_DCMI_Start_DMA / Stop 的最后一次返回状态。 */
 extern volatile HAL_StatusTypeDef camera_capture_status;
 extern volatile uint32_t camera_jpeg_bytes;

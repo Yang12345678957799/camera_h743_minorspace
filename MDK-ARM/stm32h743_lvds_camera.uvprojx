@@ -948,6 +948,21 @@
               <FileType>1</FileType>
               <FilePath>../Core/Src/services/avi_recorder.c</FilePath>
             </File>
+            <File>
+              <FileName>remote_control.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/services/remote_control.c</FilePath>
+            </File>
+            <File>
+              <FileName>uart_video_tx.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/services/uart_video_tx.c</FilePath>
+            </File>
+            <File>
+              <FileName>video_packet.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/services/video_packet.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

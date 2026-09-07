@@ -4,6 +4,7 @@
 #include "services/lvds_tx.h"
 #include "services/storage.h"
 #include "services/avi_recorder.h"
+#include "services/uart_video_tx.h"
 
 /* OV5640 芯片 ID；正常值应为 0x5640。 */
 volatile uint16_t ov5640_id = 0U;
@@ -101,6 +102,13 @@ void App_CameraProcess(void)
 {
   Camera_CapturePollDiagnostics();
 
+  /* AVI file transfer finished: resume the paused camera capture. */
+  if ((video_tx_active == 0U) && (camera_capture_paused != 0U))
+  {
+    camera_capture_paused = 0U;
+    camera_capture_status = Camera_CaptureStart();
+  }
+
   if (camera_frame_ready != 0U)
   {
     camera_frame_ready = 0U;
@@ -140,18 +148,31 @@ void App_CameraProcess(void)
       avi_record_status = (uint8_t)AVI_RecorderAddJPEG(
           (const uint8_t *)CAMERA_FRAME_ADDRESS, camera_jpeg_bytes);
       if ((avi_record_status != FR_OK) ||
-          (avi_record_request == 3U) ||
-          (avi_record_frames >= AVI_TEST_FRAME_LIMIT))
+          (avi_record_request == 3U))
       {
         if (avi_record_active != 0U)
         {
           avi_record_status = (uint8_t)AVI_RecorderStop();
+          /* Recording only by explicit stop: verify the file on-board. */
+          if (avi_record_status == FR_OK)
+          {
+            recorded_file_check_result = UARTVideoTx_VerifyRecordedFile();
+          }
         }
         avi_record_request = 4U;
       }
     }
 
     /* 连续采下一帧，供 Watch 检查 JPEG 的 SOI、EOI 和实际字节数。 */
-    camera_capture_status = Camera_CaptureStart();
+    /* While the AVI file is being sent the camera stays idle; the resume
+     * block at the top of this function restarts it afterwards. */
+    if (video_tx_active != 0U)
+    {
+      camera_capture_paused = 1U;
+    }
+    else
+    {
+      camera_capture_status = Camera_CaptureStart();
+    }
   }
 }

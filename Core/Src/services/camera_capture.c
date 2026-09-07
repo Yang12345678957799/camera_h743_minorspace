@@ -3,6 +3,9 @@
 
 /* 由 HAL_DCMI_FrameEventCallback 在 DMA 完成时置位。 */
 volatile uint8_t camera_frame_ready = 0U;
+/* 1 = capture intentionally paused (AVI file transfer): no restart and
+ * no stall-recovery while set. Set/cleared by app_camera. */
+volatile uint8_t camera_capture_paused = 0U;
 /* 供应用层和 Keil Watch 检查 DCMI 启动、停止或错误状态。 */
 volatile HAL_StatusTypeDef camera_capture_status = HAL_ERROR;
 volatile uint32_t camera_jpeg_bytes = 0U;
@@ -123,6 +126,7 @@ void Camera_CapturePollDiagnostics(void)
     if ((camera_jpeg_received_bytes != 0U) &&
         (camera_jpeg_eoi_found == 0U) &&
         (camera_frame_ready == 0U) &&
+        (camera_capture_paused == 0U) &&
         ((HAL_GetTick() - camera_last_dma_progress_tick) >= 250U))
     {
       camera_capture_stall_recoveries++;

@@ -33,6 +33,8 @@
 /* USER CODE BEGIN Includes */
 #include "app/app_camera.h"
 #include "services/storage.h"
+#include "services/remote_control.h"
+#include "services/uart_video_tx.h"
 
 /* USER CODE END Includes */
 
@@ -111,14 +113,20 @@ int main(void)
   (void)Storage_Mount();
   App_CameraInit();
 
+  /* USART1 remote control: interrupt reception of command frames. */
+  RemoteControl_Init();
+  UARTVideoTx_Init();
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+    RemoteControl_Process();
     Storage_Process();
     App_CameraProcess();
+    UARTVideoTx_Process();
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
