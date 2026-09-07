@@ -2,11 +2,12 @@
 #define APP_CAMERA_H
 
 #include "stm32h7xx_hal.h"
+#include "fatfs.h"
 
 /*
  * 应用层：决定相机模块的执行顺序。
- * 当前流程为：识别 OV5640 -> 配置 QVGA RGB565 -> 启动 DCMI 采集
- * -> 一帧采集完成后，发送一个 LVDS 测试数据包。
+ * 当前流程为：识别 OV5640 -> 配置 JPEG QVGA -> 启动 DCMI 快照采集
+ * -> 一帧完成后按录像、拍照或诊断请求处理，再开始下一帧。
  */
 void App_CameraInit(void);
 void App_CameraProcess(void);
@@ -36,5 +37,29 @@ extern volatile uint32_t camera_raw_images_saved;
 extern volatile uint8_t camera_jpeg_save_request;
 extern volatile uint8_t camera_jpeg_save_status;
 extern volatile uint32_t camera_jpeg_images_saved;
+
+/* Remote photo capture state, retained for Keil Watch. */
+#define PHOTO_CAPTURE_STATUS_IDLE      0U
+#define PHOTO_CAPTURE_STATUS_CAPTURING 1U
+#define PHOTO_CAPTURE_STATUS_COMPLETE  2U
+#define PHOTO_CAPTURE_STATUS_ERROR     3U
+
+extern volatile uint8_t photo_capture_active;
+extern volatile uint16_t photo_capture_target;
+extern volatile uint16_t photo_capture_saved;
+extern volatile uint16_t photo_capture_failed;
+extern volatile uint16_t photo_capture_invalid_frames;
+extern volatile uint8_t photo_capture_status;
+extern volatile uint8_t photo_batch_valid;
+extern volatile uint16_t photo_batch_completed_count;
+extern volatile FRESULT photo_last_save_result;
+extern volatile uint32_t photo_last_file_size;
+/* Main-loop response flags; never sent from a DCMI callback. */
+extern volatile uint8_t photo_capture_done_pending;
+extern volatile uint8_t photo_capture_error_pending;
+
+/* Starts a batch which consumes future complete JPEG frames one at a time.
+ * FR_LOCKED means another camera/SD/UART job owns the system. */
+FRESULT App_CameraStartPhotoCapture(uint16_t count);
 
 #endif /* APP_CAMERA_H */

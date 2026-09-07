@@ -2,6 +2,8 @@
 #include "usart.h"
 #include "services/avi_recorder.h"
 #include "services/uart_video_tx.h"
+#include "services/uart_image_tx.h"
+#include "app/app_camera.h"
 #include <string.h>
 
 /*
@@ -10,7 +12,7 @@
  * Reception is interrupt-driven (one byte per HAL_UART_Receive_IT) so no
  * command bytes are lost while the main loop is blocked in SD-card writes
  * during AVI recording. Bytes land in a ring buffer; RemoteControl_Process()
- * scans it for 6-byte frames, verifies the header and the checksum, and
+ * scans it for length-prefixed frames, verifies the header and checksum, and
  * executes the command. Reception stays alive while the AVI transfer is
  * running (HAL gState/RxState are independent).
  *
@@ -49,6 +51,33 @@ static void RC_Respond(const char *text)
                           (uint16_t)strlen(text), 100U);
 }
 
+static void RC_RespondPhoto(const char *prefix, uint16_t count)
+{
+  char response[24];
+  uint8_t length = 0U;
+  uint16_t value = count;
+  char digits[3];
+  uint8_t digit_count = 0U;
+
+  while (*prefix != '\0')
+  {
+    response[length++] = *prefix++;
+  }
+  do
+  {
+    digits[digit_count++] = (char)('0' + (value % 10U));
+    value /= 10U;
+  } while (value != 0U);
+  while (digit_count != 0U)
+  {
+    response[length++] = digits[--digit_count];
+  }
+  response[length++] = '\r';
+  response[length++] = '\n';
+  response[length] = '\0';
+  RC_Respond(response);
+}
+
 void RemoteControl_Init(void)
 {
   rc_head = 0U;
@@ -59,13 +88,19 @@ void RemoteControl_Init(void)
   }
 }
 
-/* Execute one verified frame (class = byte 2, cmd = byte 4). */
-static void RC_Execute(uint8_t frame_class, uint8_t cmd)
+/* Execute one verified frame.  The command byte is payload[0]. */
+static void RC_Execute(uint8_t frame_class, const uint8_t *payload,
+                       uint8_t payload_length)
 {
-  if ((frame_class == 0x02U) && (cmd == REMOTE_CMD_REC_START))
+  uint8_t cmd = payload[0];
+  FRESULT result;
+
+  if ((frame_class == 0x02U) && (payload_length == 1U) &&
+      (cmd == REMOTE_CMD_REC_START))
   {
     remote_last_command = REMOTE_CMD_REC_START;
-    if (video_tx_active != 0U)
+    if ((video_tx_active != 0U) || (image_tx_active != 0U) ||
+        (photo_capture_active != 0U))
     {
       RC_Respond("ERR BUSY\r\n");           /* file transfer in progress */
     }
@@ -79,7 +114,8 @@ static void RC_Execute(uint8_t frame_class, uint8_t cmd)
       RC_Respond("OK REC_START\r\n");
     }
   }
-  else if ((frame_class == 0x02U) && (cmd == REMOTE_CMD_REC_STOP))
+  else if ((frame_class == 0x02U) && (payload_length == 1U) &&
+           (cmd == REMOTE_CMD_REC_STOP))
   {
     remote_last_command = REMOTE_CMD_REC_STOP;
     if (avi_record_active != 0U)
@@ -92,16 +128,64 @@ static void RC_Execute(uint8_t frame_class, uint8_t cmd)
       RC_Respond("ERR NOT_RECORDING\r\n");
     }
   }
-  else if ((frame_class == 0x14U) && (cmd == REMOTE_CMD_VIDEO_TRANSFER_START))
+  else if ((frame_class == 0x14U) && (payload_length == 1U) &&
+           (cmd == REMOTE_CMD_VIDEO_TRANSFER_START))
   {
     remote_last_command = REMOTE_CMD_VIDEO_TRANSFER_START;
-    if (UARTVideoTx_Start() == FR_OK)
+    result = UARTVideoTx_Start();
+    if (result == FR_OK)
     {
       RC_Respond("OK VIDEO_TX\r\n");
+    }
+    else if (result == FR_LOCKED)
+    {
+      RC_Respond("ERR BUSY\r\n");
     }
     else
     {
       RC_Respond("ERR VIDEO_TX\r\n");
+    }
+  }
+  else if ((frame_class == 0x02U) && (cmd == REMOTE_CMD_PHOTO_CAPTURE) &&
+           ((payload_length == 1U) || (payload_length == 2U)))
+  {
+    uint16_t count = (payload_length == 1U) ? 1U : payload[1];
+    remote_last_command = REMOTE_CMD_PHOTO_CAPTURE;
+    if (count == 0U)
+    {
+      RC_Respond("ERR PHOTO\r\n");
+      return;
+    }
+    result = App_CameraStartPhotoCapture(count);
+    if (result == FR_OK)
+    {
+      RC_RespondPhoto("OK PHOTO_START ", count);
+    }
+    else if (result == FR_LOCKED)
+    {
+      RC_Respond("ERR BUSY\r\n");
+    }
+    else
+    {
+      RC_Respond("ERR PHOTO\r\n");
+    }
+  }
+  else if ((frame_class == 0x14U) && (payload_length == 1U) &&
+           (cmd == REMOTE_CMD_IMAGE_TRANSFER_START))
+  {
+    remote_last_command = REMOTE_CMD_IMAGE_TRANSFER_START;
+    result = UARTImageTx_Start();
+    if (result == FR_OK)
+    {
+      RC_Respond("OK IMAGE_TX\r\n");
+    }
+    else if (result == FR_LOCKED)
+    {
+      RC_Respond("ERR BUSY\r\n");
+    }
+    else
+    {
+      RC_Respond("ERR IMAGE_TX\r\n");
     }
   }
   else
@@ -114,31 +198,76 @@ static void RC_Execute(uint8_t frame_class, uint8_t cmd)
 
 void RemoteControl_Process(void)
 {
-  uint8_t frame[RC_FRAME_SIZE];
+  uint8_t frame[RC_MIN_FRAME_SIZE + RC_MAX_PAYLOAD];
+  uint16_t available;
+  uint8_t payload_length;
+  uint8_t frame_length;
   uint32_t sum;
   uint8_t index;
 
-  while ((uint16_t)(rc_head - rc_tail) >= RC_FRAME_SIZE)
+  /* These flags are raised by App_CameraProcess in main-loop context after
+   * DCMI work, never inside an ISR. */
+  if (photo_capture_done_pending != 0U)
   {
-    for (index = 0U; index < RC_FRAME_SIZE; index++)
+    photo_capture_done_pending = 0U;
+    RC_RespondPhoto("OK PHOTO_DONE ", photo_batch_completed_count);
+  }
+  if (photo_capture_error_pending != 0U)
+  {
+    photo_capture_error_pending = 0U;
+    RC_Respond("ERR PHOTO\r\n");
+  }
+
+  while (1)
+  {
+    available = (uint16_t)(rc_head - rc_tail);
+    if (available < 2U)
+    {
+      break;
+    }
+
+    if ((rc_ring[rc_tail & RC_RING_MASK] != RC_HEADER0) ||
+        (rc_ring[(uint16_t)(rc_tail + 1U) & RC_RING_MASK] != RC_HEADER1))
+    {
+      rc_tail = (uint16_t)(rc_tail + 1U);
+      continue;
+    }
+    if (available < 4U)
+    {
+      break;
+    }
+
+    payload_length = rc_ring[(uint16_t)(rc_tail + 3U) & RC_RING_MASK];
+    if ((payload_length == 0U) || (payload_length > RC_MAX_PAYLOAD))
+    {
+      rc_tail = (uint16_t)(rc_tail + 1U);
+      continue;
+    }
+    frame_length = (uint8_t)(RC_MIN_FRAME_SIZE + payload_length);
+    if (available < frame_length)
+    {
+      break;
+    }
+
+    for (index = 0U; index < frame_length; index++)
     {
       frame[index] = rc_ring[(uint16_t)(rc_tail + index) & RC_RING_MASK];
     }
 
-    if ((frame[0] == RC_HEADER0) && (frame[1] == RC_HEADER1))
+    sum = 0U;
+    for (index = 0U; index < (uint8_t)(frame_length - 1U); index++)
     {
-      sum = (uint32_t)frame[0] + frame[1] + frame[2] + frame[3] + frame[4];
-      if ((uint8_t)sum == frame[5])
-      {
-        remote_valid_frames++;
-        rc_tail = (uint16_t)(rc_tail + RC_FRAME_SIZE);
-        RC_Execute(frame[2], frame[4]);
-        continue;
-      }
-      remote_checksum_errors++;
+      sum += frame[index];
     }
-
-    /* No header or bad checksum: resynchronise one byte at a time. */
+    if ((uint8_t)sum == frame[frame_length - 1U])
+    {
+      remote_valid_frames++;
+      rc_tail = (uint16_t)(rc_tail + frame_length);
+      RC_Execute(frame[2], &frame[4], payload_length);
+      continue;
+    }
+    remote_checksum_errors++;
+    /* Bad checksum: preserve following candidate headers by consuming one. */
     rc_tail = (uint16_t)(rc_tail + 1U);
   }
 }
@@ -183,6 +312,7 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
     uart_video_error_code = huart->ErrorCode;
     uart_video_error_pending = 1U;
   }
+  UARTImageTx_OnUartError(huart->ErrorCode);
   if (HAL_UART_Receive_IT(&huart1, &rc_rx_byte, 1U) != HAL_OK)
   {
     remote_rx_errors++;

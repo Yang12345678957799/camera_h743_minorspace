@@ -35,6 +35,7 @@
 #include "services/storage.h"
 #include "services/remote_control.h"
 #include "services/uart_video_tx.h"
+#include "services/uart_image_tx.h"
 
 /* USER CODE END Includes */
 
@@ -116,6 +117,7 @@ int main(void)
   /* USART1 remote control: interrupt reception of command frames. */
   RemoteControl_Init();
   UARTVideoTx_Init();
+  UARTImageTx_Init();
 
   /* USER CODE END 2 */
 
@@ -127,6 +129,7 @@ int main(void)
     Storage_Process();
     App_CameraProcess();
     UARTVideoTx_Process();
+    UARTImageTx_Process();
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

@@ -1,3 +1,9 @@
 __pycache__/
 *.pyc
 received_*.avi
+received_*.jpg
+
+# Keil MDK per-user settings and generated build outputs
+MDK-ARM/*.uvguix.*
+MDK-ARM/*.uvoptx
+MDK-ARM/stm32h743_lvds_camera/

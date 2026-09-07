@@ -2,6 +2,8 @@
 #include "usart.h"
 #include "services/storage.h"
 #include "services/avi_recorder.h"
+#include "services/uart_image_tx.h"
+#include "app/app_camera.h"
 #include <string.h>
 
 /*
@@ -74,7 +76,8 @@ FRESULT UARTVideoTx_Start(void)
 {
   FRESULT result;
 
-  if (video_tx_active != 0U)
+  if ((video_tx_active != 0U) || (image_tx_active != 0U) ||
+      (photo_capture_active != 0U))
   {
     return FR_LOCKED;
   }
@@ -298,11 +301,19 @@ FRESULT UARTVideoTx_VerifyRecordedFile(void)
   return FR_NO_FILE;
 }
 
-/* ISR context: keep this as light as the phase-2 spec demands. */
+/* The one USART1 completion callback fans out to the mutually exclusive file
+ * transfer state machines.  Both handlers only set volatile flags. */
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 {
   if (huart->Instance == USART1)
   {
-    video_uart_tx_complete = 1U;
+    if (video_tx_active != 0U)
+    {
+      video_uart_tx_complete = 1U;
+    }
+    if (image_tx_active != 0U)
+    {
+      UARTImageTx_OnTxComplete();
+    }
   }
 }

@@ -5,6 +5,9 @@
 #include "services/storage.h"
 #include "services/avi_recorder.h"
 #include "services/uart_video_tx.h"
+#include "services/uart_image_tx.h"
+
+#define PHOTO_CAPTURE_MAX_INVALID_FRAMES 20U
 
 /* OV5640 芯片 ID；正常值应为 0x5640。 */
 volatile uint16_t ov5640_id = 0U;
@@ -23,12 +26,79 @@ volatile uint32_t camera_raw_images_saved = 0U;
 volatile uint8_t camera_jpeg_save_request = 0U;
 volatile uint8_t camera_jpeg_save_status = FR_NOT_READY;
 volatile uint32_t camera_jpeg_images_saved = 0U;
+volatile uint8_t photo_capture_active = 0U;
+volatile uint16_t photo_capture_target = 0U;
+volatile uint16_t photo_capture_saved = 0U;
+volatile uint16_t photo_capture_failed = 0U;
+volatile uint16_t photo_capture_invalid_frames = 0U;
+volatile uint8_t photo_capture_status = PHOTO_CAPTURE_STATUS_IDLE;
+volatile uint8_t photo_batch_valid = 0U;
+volatile uint16_t photo_batch_completed_count = 0U;
+volatile FRESULT photo_last_save_result = FR_NOT_READY;
+volatile uint32_t photo_last_file_size = 0U;
+volatile uint8_t photo_capture_done_pending = 0U;
+volatile uint8_t photo_capture_error_pending = 0U;
 
-/*
- * Send one complete RGB565 QVGA frame using the existing LVDS packet format.
- * 153600 bytes are split into 179 packets: 178 x 862 bytes plus 1 x 164 bytes.
- * Packet indexes remain zero-based, consistent with the initial single-packet test.
- */
+static uint32_t photo_last_stall_recoveries = 0U;
+
+static void App_CameraPhotoMakePath(uint16_t image_index, TCHAR *path)
+{
+  uint16_t value = image_index;
+
+  path[0] = '0'; path[1] = ':'; path[2] = '/'; path[3] = 'i';
+  path[4] = 'm'; path[5] = 'g'; path[6] = '/'; path[7] = 'I';
+  path[8] = 'M'; path[9] = 'G';
+  path[15] = '.'; path[16] = 'J'; path[17] = 'P'; path[18] = 'G';
+  path[19] = '\0';
+  path[14] = (TCHAR)('0' + (value % 10U)); value /= 10U;
+  path[13] = (TCHAR)('0' + (value % 10U)); value /= 10U;
+  path[12] = (TCHAR)('0' + (value % 10U)); value /= 10U;
+  path[11] = (TCHAR)('0' + (value % 10U)); value /= 10U;
+  path[10] = (TCHAR)('0' + (value % 10U));
+}
+
+static void App_CameraPhotoFail(FRESULT result)
+{
+  photo_capture_active = 0U;
+  photo_capture_failed++;
+  photo_capture_status = PHOTO_CAPTURE_STATUS_ERROR;
+  photo_batch_valid = 0U;
+  photo_last_save_result = result;
+  photo_capture_error_pending = 1U;
+}
+
+FRESULT App_CameraStartPhotoCapture(uint16_t count)
+{
+  if ((count == 0U) || (count > 255U))
+  {
+    return FR_INVALID_PARAMETER;
+  }
+  if ((avi_record_active != 0U) || (avi_record_request == 1U) ||
+      (avi_record_request == 2U) || (avi_record_request == 3U) ||
+      (video_tx_active != 0U) ||
+      (image_tx_active != 0U) || (photo_capture_active != 0U))
+  {
+    return FR_LOCKED;
+  }
+
+  photo_capture_target = count;
+  photo_capture_saved = 0U;
+  photo_capture_failed = 0U;
+  photo_capture_invalid_frames = 0U;
+  photo_capture_status = PHOTO_CAPTURE_STATUS_CAPTURING;
+  photo_batch_valid = 0U;
+  photo_batch_completed_count = 0U;
+  photo_last_save_result = FR_OK;
+  photo_last_file_size = 0U;
+  photo_capture_done_pending = 0U;
+  photo_capture_error_pending = 0U;
+  photo_last_stall_recoveries = camera_capture_stall_recoveries;
+  photo_capture_active = 1U;
+  return FR_OK;
+}
+
+/* Legacy SPI/LVDS RGB565 diagnostic path retained for hardware tests.  Normal
+ * JPEG capture, AVI recording and the new photo batch feature do not call it. */
 static HAL_StatusTypeDef App_CameraSendFrame(void)
 {
   const uint8_t *frame = (const uint8_t *)CAMERA_FRAME_ADDRESS;
@@ -75,6 +145,9 @@ void App_CameraInit(void)
   camera_images_saved = 0U;
   camera_raw_images_saved = 0U;
   camera_jpeg_images_saved = 0U;
+  photo_capture_active = 0U;
+  photo_capture_status = PHOTO_CAPTURE_STATUS_IDLE;
+  photo_batch_valid = 0U;
 
   ov5640_status = OV5640_Probe(&ov5640_id);
   if (ov5640_status != HAL_OK)
@@ -100,10 +173,36 @@ void App_CameraInit(void)
 /* JPEG 首帧验证流程：不复用 RGB565 的固定长度 LVDS/BMP 保存路径。 */
 void App_CameraProcess(void)
 {
+  uint8_t jpeg_valid;
+
   Camera_CapturePollDiagnostics();
 
-  /* AVI file transfer finished: resume the paused camera capture. */
-  if ((video_tx_active == 0U) && (camera_capture_paused != 0U))
+  /* A stalled (truncated) JPEG is restarted inside camera_capture.c.  Count
+   * that discarded frame when a remote photo batch owns the capture loop. */
+  if ((photo_capture_active != 0U) &&
+      (camera_capture_stall_recoveries != photo_last_stall_recoveries))
+  {
+    photo_capture_invalid_frames += (uint16_t)(camera_capture_stall_recoveries -
+                                                photo_last_stall_recoveries);
+    photo_last_stall_recoveries = camera_capture_stall_recoveries;
+    if (photo_capture_invalid_frames >= PHOTO_CAPTURE_MAX_INVALID_FRAMES)
+    {
+      (void)Camera_CaptureStop();
+      App_CameraPhotoFail(FR_INT_ERR);
+    }
+  }
+
+  /* File transfer owns the SD/UART path.  Stop the current camera snapshot
+   * immediately and keep it paused until BOTH transfer state machines end. */
+  if ((video_tx_active != 0U) || (image_tx_active != 0U))
+  {
+    if (camera_capture_paused == 0U)
+    {
+      (void)Camera_CaptureStop();
+      camera_capture_paused = 1U;
+    }
+  }
+  else if (camera_capture_paused != 0U)
   {
     camera_capture_paused = 0U;
     camera_capture_status = Camera_CaptureStart();
@@ -116,10 +215,13 @@ void App_CameraProcess(void)
     /* JPEG 为可变长度数据。帧结束后停止 DMA，才可读取 SDRAM。 */
     (void)Camera_CaptureStop();
 
+    jpeg_valid = (uint8_t)((camera_jpeg_soi_found != 0U) &&
+                            (camera_jpeg_eoi_found != 0U) &&
+                            (camera_jpeg_bytes != 0U));
+
     if ((camera_jpeg_save_request == 1U) &&
         (camera_jpeg_soi_found != 0U) &&
-        (camera_jpeg_eoi_found != 0U) &&
-        (camera_jpeg_bytes != 0U))
+        (jpeg_valid != 0U))
     {
       camera_jpeg_save_request = 2U;
       camera_jpeg_save_status = Storage_SaveRawImage(
@@ -128,6 +230,45 @@ void App_CameraProcess(void)
       if (camera_jpeg_save_status == FR_OK)
       {
         camera_jpeg_images_saved++;
+      }
+    }
+
+    /* A batch consumes exactly one successfully saved JPEG per completed
+     * DCMI frame.  It never loops or waits in this main-loop iteration. */
+    if (photo_capture_active != 0U)
+    {
+      if (jpeg_valid == 0U)
+      {
+        photo_capture_invalid_frames++;
+        if (photo_capture_invalid_frames >= PHOTO_CAPTURE_MAX_INVALID_FRAMES)
+        {
+          App_CameraPhotoFail(FR_INT_ERR);
+        }
+      }
+      else
+      {
+        TCHAR photo_path[20];
+        App_CameraPhotoMakePath((uint16_t)(photo_capture_saved + 1U), photo_path);
+        photo_last_save_result = Storage_SaveRawImage(
+            (const uint8_t *)CAMERA_FRAME_ADDRESS, camera_jpeg_bytes,
+            "0:/img", photo_path);
+        if (photo_last_save_result != FR_OK)
+        {
+          App_CameraPhotoFail(photo_last_save_result);
+        }
+        else
+        {
+          photo_capture_saved++;
+          photo_last_file_size = camera_jpeg_bytes;
+          if (photo_capture_saved >= photo_capture_target)
+          {
+            photo_capture_active = 0U;
+            photo_batch_valid = 1U;
+            photo_batch_completed_count = photo_capture_saved;
+            photo_capture_status = PHOTO_CAPTURE_STATUS_COMPLETE;
+            photo_capture_done_pending = 1U;
+          }
+        }
       }
     }
 
@@ -142,8 +283,7 @@ void App_CameraProcess(void)
 
     if ((avi_record_active != 0U) &&
         (camera_jpeg_soi_found != 0U) &&
-        (camera_jpeg_eoi_found != 0U) &&
-        (camera_jpeg_bytes != 0U))
+        (jpeg_valid != 0U))
     {
       avi_record_status = (uint8_t)AVI_RecorderAddJPEG(
           (const uint8_t *)CAMERA_FRAME_ADDRESS, camera_jpeg_bytes);
@@ -163,10 +303,9 @@ void App_CameraProcess(void)
       }
     }
 
-    /* 连续采下一帧，供 Watch 检查 JPEG 的 SOI、EOI 和实际字节数。 */
-    /* While the AVI file is being sent the camera stays idle; the resume
-     * block at the top of this function restarts it afterwards. */
-    if (video_tx_active != 0U)
+    /* Keep continuous JPEG sampling only while neither file transfer owns
+     * the camera.  Photo capture simply uses this one-frame-at-a-time loop. */
+    if ((video_tx_active != 0U) || (image_tx_active != 0U))
     {
       camera_capture_paused = 1U;
     }

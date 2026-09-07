@@ -3,29 +3,36 @@
 
 #include "stm32h7xx_hal.h"
 
-/* Remote-control frame on USART1 (115200 8N1), 6 bytes:
+/* Remote-control frame on USART1 (115200 8N1), variable length:
  *
- *   EB 90 | class | sub | cmd | checksum
+ *   EB 90 | class | payload_length | payload... | checksum
  *
- * checksum = (Byte0+Byte1+Byte2+Byte3+Byte4) & 0xFF, e.g.
+ * total length = 5 + payload_length; checksum is the low byte of the sum of
+ * every preceding byte.  Existing one-byte payload commands remain 6 bytes:
  *   EB 90 02 01 53 D1  ->  start recording
  *   EB 90 02 01 54 D2  ->  stop recording
  *   EB 90 14 01 11 A1  ->  start AVI file transfer to the PC ("视频传输LVDS"
  *                          in the legacy host software; the physical link is
  *                          USART1/RS422, no LVDS hardware involved)
+ *   EB 90 02 01 45 C3  ->  capture one JPEG (F429-compatible)
+ *   EB 90 02 02 45 NN CS -> capture NN JPEGs; CS sums EB through NN
+ *   EB 90 14 01 33 C3  ->  transfer the latest completed JPEG batch
  *
  * EB 90 14 01 22 B2 (abort transfer) is defined on the F429 side but is NOT
  * accepted in this phase; UARTVideoTx_Stop() stays available internally so
  * the command can be wired up later without further changes. */
-#define RC_FRAME_SIZE     6U
 #define RC_HEADER0        0xEBU
 #define RC_HEADER1        0x90U
+#define RC_MAX_PAYLOAD    8U
+#define RC_MIN_FRAME_SIZE 5U
 
 /* Command codes carried in frame byte 4. */
 #define REMOTE_CMD_NONE                  0U
 #define REMOTE_CMD_REC_START             0x53U
 #define REMOTE_CMD_REC_STOP              0x54U
 #define REMOTE_CMD_VIDEO_TRANSFER_START  0x11U
+#define REMOTE_CMD_PHOTO_CAPTURE          0x45U
+#define REMOTE_CMD_IMAGE_TRANSFER_START   0x33U
 #define REMOTE_CMD_UNKNOWN               0xFFU
 
 /* Last accepted command code, for Keil Watch. */

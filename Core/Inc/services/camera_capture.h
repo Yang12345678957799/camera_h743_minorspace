@@ -3,7 +3,8 @@
 
 #include "stm32h7xx_hal.h"
 
-/* 当前测试分辨率：RGB565 的 QVGA 图像，每个像素 2 字节。 */
+/* OV5640 当前输出 JPEG QVGA。DMA 使用这块 153600-byte SDRAM 缓冲作为
+ * 最大接收容量；每张 JPEG 的真实长度必须读取 camera_jpeg_bytes。 */
 #define CAMERA_FRAME_WIDTH       320U
 #define CAMERA_FRAME_HEIGHT      240U
 #define CAMERA_FRAME_BYTES       (CAMERA_FRAME_WIDTH * CAMERA_FRAME_HEIGHT * 2U)
